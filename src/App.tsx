@@ -1,33 +1,46 @@
-import { useEffect, useState } from "react";
-import type { Schema } from "../amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
-
-const client = generateClient<Schema>();
+import { useState } from "react";
 
 function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
-
-  useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
-  }, []);
+  const [todos, setTodos] = useState<string[]>([]);
+  const [newTodo, setNewTodo] = useState("");
 
   function createTodo() {
-    client.models.Todo.create({ content: window.prompt("Todo content") });
+    const content = newTodo.trim();
+    if (content) {
+      setTodos([...todos, content]);
+      setNewTodo("");
+    }
+  }
+
+  function removeTodo(index: number) {
+    setTodos(todos.filter((_, i) => i !== index));
   }
 
   return (
     <main>
       <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
+      <div>
+        <input
+          type="text"
+          value={newTodo}
+          onChange={(e) => setNewTodo(e.target.value)}
+          placeholder="Enter todo content"
+          onKeyPress={(e) => e.key === 'Enter' && createTodo()}
+        />
+        <button onClick={createTodo}>+ new</button>
+      </div>
       <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
+        {todos.map((todo, index) => (
+          <li key={index}>
+            {todo}
+            <button onClick={() => removeTodo(index)} style={{ marginLeft: '10px' }}>
+              Remove
+            </button>
+          </li>
         ))}
       </ul>
       <div>
-        🥳 App successfully hosted. Try creating a new todo.
+        🥳 App successfully hosted! This is a frontend-only version.
         <br />
         <a href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates">
           Review next step of this tutorial.
