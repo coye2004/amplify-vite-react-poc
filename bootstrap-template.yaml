@@ -49,8 +49,20 @@ Parameters:
     Type: String
   BootstrapVariant:
     Type: String
-    Default: "AWS CDK: Default Resources"
+    Default: "AWS CDK: Customized for ADSK-Boundary with Amplify Support"
     Description: Describe the provenance of the resources in this bootstrap stack. Change this when you customize the template. To prevent accidents, the CDK CLI will not overwrite bootstrap stacks with a different variant.
+  DenyExternalId:
+    # By default, CDK Bootstrap roles are not designed to be deputized.
+    # Deputized means that you give an external entity access to assume roles on
+    # your behalf. They will supply an ExternalId to avoid Confused Deputy
+    # attacks (https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html).
+    #
+    # AssumeRole calls with ExternalIds will be denied by default, set this to 'false'
+    # if you need this functionality for some reason.
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Whether to deny AssumeRole calls with an ExternalId. This prevents calls that are intended to be deputized from accidentally assuming CDK Roles.
 Conditions:
   HasTrustedAccounts:
     Fn::Not:
@@ -104,6 +116,10 @@ Conditions:
     Fn::Equals:
       - "true"
       - Ref: PublicAccessBlockConfiguration
+  ShouldDenyExternalId:
+    Fn::Equals:
+      - 'true'
+      - Ref: DenyExternalId
 Resources:
   FileAssetsBucketEncryptionKey:
     Type: AWS::KMS::Key
@@ -288,16 +304,31 @@ Resources:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-          - Action: sts:TagSession
-            Effect: Allow
-            Principal:
-              AWS:
-                Ref: AWS::AccountId
+          # AssumeRole for same account (no ExternalId)
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
               AWS:
                 Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # TagSession for same account
+          - Action: sts:TagSession
+            Effect: Allow
+            Principal:
+              AWS:
+                Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # AssumeRole for trusted accounts (no ExternalId)
           - Fn::If:
               - HasTrustedAccounts
               - Action: sts:AssumeRole
@@ -305,7 +336,14 @@ Resources:
                 Principal:
                   AWS:
                     Ref: TrustedAccounts
+                Condition:
+                  Fn::If:
+                    - ShouldDenyExternalId
+                    - "Null":
+                        "sts:ExternalId": "true"
+                    - Ref: AWS::NoValue
               - Ref: AWS::NoValue
+        Version: '2012-10-17'
       RoleName:
         Fn::Sub: cdk-${Qualifier}-file-publishing-role-${AWS::AccountId}-${AWS::Region}
       PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
@@ -317,16 +355,31 @@ Resources:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-          - Action: sts:TagSession
-            Effect: Allow
-            Principal:
-              AWS:
-                Ref: AWS::AccountId
+          # AssumeRole for same account (no ExternalId)
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
               AWS:
                 Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # TagSession for same account
+          - Action: sts:TagSession
+            Effect: Allow
+            Principal:
+              AWS:
+                Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # AssumeRole for trusted accounts (no ExternalId)
           - Fn::If:
               - HasTrustedAccounts
               - Action: sts:AssumeRole
@@ -334,7 +387,14 @@ Resources:
                 Principal:
                   AWS:
                     Ref: TrustedAccounts
+                Condition:
+                  Fn::If:
+                    - ShouldDenyExternalId
+                    - "Null":
+                        "sts:ExternalId": "true"
+                    - Ref: AWS::NoValue
               - Ref: AWS::NoValue
+        Version: '2012-10-17'
       RoleName:
         Fn::Sub: cdk-${Qualifier}-image-publishing-role-${AWS::AccountId}-${AWS::Region}
       PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
@@ -346,16 +406,31 @@ Resources:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-          - Action: sts:TagSession
-            Effect: Allow
-            Principal:
-              AWS:
-                Ref: AWS::AccountId
+          # AssumeRole for same account (no ExternalId)
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
               AWS:
                 Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # TagSession for same account
+          - Action: sts:TagSession
+            Effect: Allow
+            Principal:
+              AWS:
+                Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # AssumeRole for trusted accounts for lookup (no ExternalId)
           - Fn::If:
               - HasTrustedAccountsForLookup
               - Action: sts:AssumeRole
@@ -363,7 +438,14 @@ Resources:
                 Principal:
                   AWS:
                     Ref: TrustedAccountsForLookup
+                Condition:
+                  Fn::If:
+                    - ShouldDenyExternalId
+                    - "Null":
+                        "sts:ExternalId": "true"
+                    - Ref: AWS::NoValue
               - Ref: AWS::NoValue
+          # AssumeRole for trusted accounts (no ExternalId)
           - Fn::If:
               - HasTrustedAccounts
               - Action: sts:AssumeRole
@@ -371,7 +453,14 @@ Resources:
                 Principal:
                   AWS:
                     Ref: TrustedAccounts
+                Condition:
+                  Fn::If:
+                    - ShouldDenyExternalId
+                    - "Null":
+                        "sts:ExternalId": "true"
+                    - Ref: AWS::NoValue
               - Ref: AWS::NoValue
+        Version: '2012-10-17'
       RoleName:
         Fn::Sub: cdk-${Qualifier}-lookup-role-${AWS::AccountId}-${AWS::Region}
       ManagedPolicyArns:
@@ -460,16 +549,31 @@ Resources:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-          - Action: sts:TagSession
-            Effect: Allow
-            Principal:
-              AWS:
-                Ref: AWS::AccountId
+          # AssumeRole for same account (no ExternalId)
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
               AWS:
                 Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # TagSession for same account
+          - Action: sts:TagSession
+            Effect: Allow
+            Principal:
+              AWS:
+                Ref: AWS::AccountId
+            Condition:
+              Fn::If:
+                - ShouldDenyExternalId
+                - "Null":
+                    "sts:ExternalId": "true"
+                - Ref: AWS::NoValue
+          # AssumeRole for trusted accounts (no ExternalId)
           - Fn::If:
               - HasTrustedAccounts
               - Action: sts:AssumeRole
@@ -477,7 +581,14 @@ Resources:
                 Principal:
                   AWS:
                     Ref: TrustedAccounts
+                Condition:
+                  Fn::If:
+                    - ShouldDenyExternalId
+                    - "Null":
+                        "sts:ExternalId": "true"
+                    - Ref: AWS::NoValue
               - Ref: AWS::NoValue
+        Version: '2012-10-17'
       Policies:
         - PolicyDocument:
             Statement:
@@ -578,22 +689,17 @@ Resources:
             Effect: Allow
             Principal:
               Service: cloudformation.amazonaws.com
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              AWS:
-                Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-        Version: "2012-10-17"
+        Version: '2012-10-17'
       ManagedPolicyArns:
         Fn::If:
           - HasCloudFormationExecutionPolicies
           - Ref: CloudFormationExecutionPolicies
           - Fn::If:
-              - HasTrustedAccounts
-              - Ref: AWS::NoValue
-              - - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess
-                - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/IAMFullAccess
-                - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/PowerUserAccess
+            - HasTrustedAccounts
+            # The CLI will prevent this case from occurring
+            - Ref: AWS::NoValue
+            # The CLI will advertise that we picked this implicitly
+            - - Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
       Policies:
         - PolicyDocument:
             Statement:
@@ -612,6 +718,22 @@ Resources:
                 Action:
                   - iam:*
                 Resource: "*"
+              - Sid: OverrideADSKBoundaryForAmplify
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    "iam:PermissionsBoundary": "arn:aws:iam::720853352242:policy/ADSK-Boundary"
               - Sid: EnforcePermissionBoundaryOnRoleCreation
                 Effect: Allow
                 Action:
@@ -632,6 +754,62 @@ Resources:
                 Action:
                   - iam:CreateRole
                 Resource: "*"
+                Condition:
+                  StringEquals:
+                    "iam:PermissionsBoundary": "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+              - Sid: AllowAmplifyRoleCreation
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                Resource: 
+                  - "arn:aws:iam::720853352242:role/amplify-*"
+                  - "arn:aws:iam::720853352242:role/*Amplify*"
+                  - "arn:aws:iam::720853352242:role/*amplify*"
+                Condition:
+                  StringEquals:
+                    "iam:PermissionsBoundary": "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+              - Sid: AllowAllRoleCreationWithADSKBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    "iam:PermissionsBoundary": "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+              - Sid: AllowAmplifyDynamicRoleCreation
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                Resource: 
+                  - "arn:aws:iam::720853352242:role/amplify-*"
+                  - "arn:aws:iam::720853352242:role/*Amplify*"
+                  - "arn:aws:iam::720853352242:role/*amplify*"
+                  - "arn:aws:iam::720853352242:role/*-AmplifyBranchLinkerCustom-*"
+                  - "arn:aws:iam::720853352242:role/*-AmplifyBranchLinker-*"
                 Condition:
                   StringEquals:
                     "iam:PermissionsBoundary": "arn:aws:iam::720853352242:policy/ADSK-Boundary"
@@ -726,6 +904,133 @@ Resources:
         Fn::Sub: amplify-${AWS::AccountId}-AmplifyCustomProvider-${Qualifier}
       PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
 
+  # Additional Amplify roles that might be created dynamically
+  AmplifyBranchLinkerCustomResourceProviderFrameworkOnEventServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AmplifyFrameworkOnEventPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - amplify:*
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:ListAttachedRolePolicies
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - cloudformation:*
+                Resource: "*"
+      RoleName:
+        Fn::Sub: amplify-${AWS::AccountId}-AmplifyBranchLinkerFramework-${Qualifier}
+      PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+
+  # Pre-create common Amplify role patterns to avoid dynamic creation
+  AmplifyBranchLinkerCustomRole1:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AmplifyBranchLinkerPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - amplify:*
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:ListAttachedRolePolicies
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      RoleName:
+        Fn::Sub: amplify-${AWS::AccountId}-AmplifyBranchLinkerCustom-1
+      PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+
+  AmplifyBranchLinkerCustomRole2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AmplifyBranchLinkerPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - amplify:*
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:ListAttachedRolePolicies
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      RoleName:
+        Fn::Sub: amplify-${AWS::AccountId}-AmplifyBranchLinkerCustom-2
+      PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+
+  AmplifyBranchLinkerCustomRole3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AmplifyBranchLinkerPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - amplify:*
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:ListAttachedRolePolicies
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      RoleName:
+        Fn::Sub: amplify-${AWS::AccountId}-AmplifyBranchLinkerCustom-3
+      PermissionsBoundary: "arn:aws:iam::720853352242:policy/ADSK-Boundary"
+
   CdkBoostrapPermissionsBoundaryPolicy:
     Condition: ShouldCreatePermissionsBoundary
     Type: AWS::IAM::ManagedPolicy
@@ -775,7 +1080,7 @@ Resources:
       Type: String
       Name:
         Fn::Sub: /cdk-bootstrap/${Qualifier}/version
-      Value: "28"
+      Value: "29"
 Outputs:
   BucketName:
     Description: The name of the S3 bucket owned by the CDK toolkit stack
@@ -800,11 +1105,13 @@ Outputs:
     Value:
       Fn::Sub: ${ContainerAssetsRepository}
   BootstrapVersion:
-    Description: The version of the bootstrap resources that are currently mastered in this stack
-    Value:
-      Fn::GetAtt:
-        - CdkBootstrapVersion
-        - Value
+    Description: The version of the bootstrap resources that are currently mastered
+      in this stack
+    # This value is purposely duplicated here from the AWS::SSM::Parameter value we define above.
+    # {Fn::GetAtt} on an SSM Parameter is eventually consistent, and can fail with "parameter
+    # doesn't exist" even after just having been created. To reduce our deploy failure rate, we
+    # duplicate the value here and use a build-time test to ensure the two values are the same.
+    Value: '29'
   AmplifyBranchLinkerRoleArn:
     Description: The ARN of the pre-created Amplify Branch Linker Custom Resource role
     Value:
@@ -819,4 +1126,11 @@ Outputs:
     Export:
       Name:
         Fn::Sub: CdkBootstrap-${Qualifier}-AmplifyCustomResourceProviderRoleArn
+  AmplifyBranchLinkerFrameworkRoleArn:
+    Description: The ARN of the pre-created Amplify Branch Linker Framework role
+    Value:
+      Fn::Sub: ${AmplifyBranchLinkerCustomResourceProviderFrameworkOnEventServiceRole.Arn}
+    Export:
+      Name:
+        Fn::Sub: CdkBootstrap-${Qualifier}-AmplifyBranchLinkerFrameworkRoleArn
 
